@@ -9,6 +9,9 @@ import { Upload, FileSpreadsheet, X, AlertCircle, CheckCircle2 } from 'lucide-re
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 
+const API_HOST = import.meta.env.VITE_API_HOST || "";
+const API_FILE_ENDPOINT = import.meta.env.VITE_API_FILE_ENDPOINT || "/api/file";
+
 const FILE_DEFINITIONS = {
   report: {
     columns: [
@@ -143,6 +146,7 @@ export function FileUpload() {
     setUploadStatus([]);
   };
 
+  // Handle file upload
   const handleUpload = async () => {
     setIsUploading(true);
     setUploadStatus([{
@@ -151,64 +155,69 @@ export function FileUpload() {
       status: 'uploading',
     }]);
 
-    // Simulate file upload
-    // Replace this with actual upload logic      
-    const uploadPromises = acceptedFiles.map((file, index) => {
-      return new Promise<void>((resolve) => {
-        const fakeUpload = (progress: number) => {
-          setUploadStatus((prevStatus) => {
-            const newStatus = [...prevStatus];
-            newStatus[index] = {
-              fileName: file.name,
-              progress: progress,
-              status: 'uploading',
-            };
-            return newStatus;
-          });
+    // Actual file upload logic
+    const uploadPromises = acceptedFiles.map(async (file, index) => {
+      const formData = new FormData();
+      formData.append('file', file);
 
-          if (progress < 100) {
-            setTimeout(() => {
-              fakeUpload(progress + 10);
-            }, 200);
-          } else {
-            setUploadStatus((prevStatus) => {
-              const newStatus = [...prevStatus];
-              newStatus[index] = {
-                fileName: file.name,
-                progress: 100,
-                status: 'completed',
-              };
-              return newStatus;
-            });
-            resolve();
-          }
-        };
+      try {
+        setUploadStatus((prevStatus) => {
+          const newStatus = [...prevStatus];
+          newStatus[index] = {
+            fileName: file.name,
+            progress: 30,
+            status: 'uploading',
+          };
+          return newStatus;
+        });
 
-        fakeUpload(0);
-      });
-    });
+        const response = await fetch(`${API_HOST}${API_FILE_ENDPOINT}`, {
+          method: 'POST',
+          body: formData,
+        });
 
-    Promise.all(uploadPromises)
-      .then(() => {
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || 'Upload failed');
+        }
+
+        const data = await response.json();
+
+        setUploadStatus((prevStatus) => {
+          const newStatus = [...prevStatus];
+          newStatus[index] = {
+            fileName: file.name,
+            progress: 100,
+            status: 'completed',
+          };
+          return newStatus;
+        });
+
         toast({
           title: "Upload Complete",
-          description: "All files have been successfully uploaded.",
-        })
-      })
-      .catch((error) => {
+          description: `File uploaded successfully. Request ID: ${data.requestId || data.id || 'N/A'}`,
+        });
+      } catch (error: any) {
+        setUploadStatus((prevStatus) => {
+          const newStatus = [...prevStatus];
+          newStatus[index] = {
+            fileName: file.name,
+            progress: 0,
+            status: 'error',
+            error: [error.message || 'Upload failed'],
+          };
+          return newStatus;
+        });
+
         toast({
           variant: "destructive",
           title: "Upload Failed",
-          description: "There was an error during the upload process.",
-        })
-        setUploadStatus((prevStatus) => {
-          return prevStatus.map((status) => ({
-            ...status,
-            status: 'error',
-            error: ['Upload failed'],
-          }));
+          description: error.message || "There was an error during the upload process.",
         });
-      })
+      }
+    });
+
+    Promise.all(uploadPromises)
       .finally(() => {
         setIsUploading(false);
       });

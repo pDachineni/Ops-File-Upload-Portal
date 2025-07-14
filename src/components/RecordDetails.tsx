@@ -13,7 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Search, Download, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { ArrowLeft, Search, Download, AlertCircle, CheckCircle, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+
+const API_HOST = import.meta.env.VITE_API_HOST || "";
+const API_RECORDS_ENDPOINT = import.meta.env.VITE_API_RECORDS_ENDPOINT || "/api/file/records";
+const PAGE_SIZE = Number(import.meta.env.VITE_RECORDS_PAGE_SIZE) || 10;
 
 interface RecordData {
   rowNumber: number;
@@ -98,18 +102,57 @@ export function RecordDetails() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [jobDetails] = useState<JobDetails>(mockJobDetails);
-  const [records] = useState<RecordData[]>(mockRecords);
+  const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
+  const [records, setRecords] = useState<RecordData[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!jobId) return;
+    setLoading(true);
+    setError(null);
+
+    const params = new URLSearchParams();
+    params.append("jobId", jobId);
+    params.append("page", String(page));
+    params.append("limit", String(PAGE_SIZE));
+    if (filterStatus !== "all") params.append("status", filterStatus);
+
+    fetch(`${API_HOST}${API_RECORDS_ENDPOINT}?${params.toString()}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(await res.text() || "Failed to fetch records");
+        return res.json();
+      })
+      .then((data) => {
+        // Expecting data: { jobDetails: JobDetails, records: RecordData[], total: number }
+        if (!data || !Array.isArray(data.records) || data.records.length === 0) {
+          setJobDetails(mockJobDetails);
+          setRecords(mockRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
+          setTotalPages(Math.ceil(mockRecords.length / PAGE_SIZE));
+        } else {
+          setJobDetails(data.jobDetails || mockJobDetails);
+          setRecords(data.records);
+          setTotalPages(Math.ceil((data.total || PAGE_SIZE) / PAGE_SIZE));
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message || "Failed to fetch records");
+        setJobDetails(mockJobDetails);
+        setRecords(mockRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
+        setTotalPages(Math.ceil(mockRecords.length / PAGE_SIZE));
+        setLoading(false);
+      });
+  }, [jobId, page, filterStatus]);
 
   const filteredRecords = records.filter(record => {
-    const matchesSearch = 
+    const matchesSearch =
       record.primaryKey.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.fieldA.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.fieldB.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = filterStatus === 'all' || record.status === filterStatus;
-    
-    return matchesSearch && matchesFilter;
+    return matchesSearch;
   });
 
   const getStatusIcon = (status: string) => {
@@ -144,11 +187,6 @@ export function RecordDetails() {
     // TODO: Implement CSV export
   };
 
-  useEffect(() => {
-    // TODO: Fetch job details and records from API
-    console.log('Loading job details for:', jobId);
-  }, [jobId]);
-
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center gap-4 mb-6">
@@ -164,30 +202,30 @@ export function RecordDetails() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Job Details: {jobDetails.fileName}</CardTitle>
+          <CardTitle>Job Details: {jobDetails?.fileName || ""}</CardTitle>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
             <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{jobDetails.totalRecords}</div>
+              <div className="text-2xl font-bold text-blue-600">{jobDetails?.totalRecords ?? 0}</div>
               <div className="text-sm text-muted-foreground">Total Records</div>
             </div>
             <div className="text-center p-3 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{jobDetails.successCount}</div>
+              <div className="text-2xl font-bold text-green-600">{jobDetails?.successCount ?? 0}</div>
               <div className="text-sm text-muted-foreground">Successful</div>
             </div>
             <div className="text-center p-3 bg-red-50 rounded-lg">
-              <div className="text-2xl font-bold text-red-600">{jobDetails.errorCount}</div>
+              <div className="text-2xl font-bold text-red-600">{jobDetails?.errorCount ?? 0}</div>
               <div className="text-sm text-muted-foreground">Errors</div>
             </div>
             <div className="text-center p-3 bg-yellow-50 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-600">{jobDetails.warningCount}</div>
+              <div className="text-2xl font-bold text-yellow-600">{jobDetails?.warningCount ?? 0}</div>
               <div className="text-sm text-muted-foreground">Warnings</div>
             </div>
           </div>
           <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-muted-foreground">
-              <span>Job ID: {jobDetails.jobId}</span> • 
-              <span> Processed: {jobDetails.processedAt}</span> • 
-              <span> By: {jobDetails.uploadedBy}</span>
+              <span>Job ID: {jobDetails?.jobId}</span> • 
+              <span> Processed: {jobDetails?.processedAt}</span> • 
+              <span> By: {jobDetails?.uploadedBy}</span>
             </div>
             <Button variant="outline" onClick={handleExportErrors}>
               <Download className="h-4 w-4 mr-2" />
@@ -204,7 +242,7 @@ export function RecordDetails() {
             <div className="flex items-center gap-4">
               <select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
                 className="px-3 py-2 border rounded-md text-sm"
               >
                 <option value="all">All Status</option>
@@ -271,6 +309,30 @@ export function RecordDetails() {
               <p className="text-muted-foreground">No records match your search criteria.</p>
             </div>
           )}
+          {/* Pagination Controls */}
+          <div className="flex justify-center items-center gap-4 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Prev
+            </Button>
+            <span>
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

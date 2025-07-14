@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,8 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, RotateCcw, Trash2, Eye, ExternalLink } from "lucide-react";
+import { Search, RotateCcw, Trash2, Eye, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+const API_HOST = import.meta.env.VITE_API_HOST || "";
+const API_STATUS_ENDPOINT = import.meta.env.VITE_API_STATUS_ENDPOINT || "/api/file/status";
 
 interface FileRecord {
   id: string;
@@ -79,13 +81,115 @@ const mockFiles: FileRecord[] = [
     uploadedBy: 'jane@example.com',
     fileSize: '3.2 MB',
     errorMessage: 'Validation failed on 45 records due to missing required fields'
-  }
+  },
+  {
+    id: '6',
+    fileName: 'marketing-campaigns.xlsx',
+    recordCount: 1200,
+    jobId: 'job_stu789vwx',
+    dateUploaded: '2025-01-02 11:00 AM',
+    processingStatus: 'uploading',
+    uploadedBy: '',
+    fileSize: '2.8 MB'
+  },
+  { id: '7',
+    fileName: 'financial-statements.xlsx',
+    recordCount: 0,
+    jobId: 'job_yza123bcd',
+    dateUploaded: '2025-01-02 09:30 AM',
+    processingStatus: 'upload-failed',
+    uploadedBy: ''  ,
+    fileSize: '10.5 MB',
+    errorMessage: 'File format not supported'
+  },
+  {
+    id: '8',
+    fileName: 'project-timeline.xlsx',
+    recordCount: 450,
+    jobId: 'job_efg456hij',
+    dateUploaded: '2025-01-01 03:00 PM',
+    processingStatus: 'processed',
+    uploadedBy: '',
+    fileSize: '1.5 MB',
+    errorMessage: 'Some records had warnings'
+  },
+  { id: '9',
+    fileName: 'budget-forecast.xlsx', 
+
+    recordCount: 0,
+    jobId: 'job_klm789nop',
+    dateUploaded: '2025-01-01 01:45 PM',
+    processingStatus: 'upload-failed',
+    uploadedBy: '',
+    fileSize: '4.3 MB',
+    errorMessage: 'File is empty'
+  },
+  { id: '10',
+    fileName: 'vendor-list.xlsx', 
+    recordCount: 320,
+    jobId: 'job_qrs123tuv',
+    dateUploaded: '2025-01-01 11:20 AM',
+    processingStatus: 'processed',
+    uploadedBy: '',
+    fileSize: '2.0 MB'
+  },
+
+  { id: '11',
+    fileName: 'vendor-list.xlsx', 
+    recordCount: 320,
+    jobId: 'job_qqrs123tuv',
+    dateUploaded: '2025-01-01 11:20 AM',
+    processingStatus: 'processed',
+    uploadedBy: '',
+    fileSize: '2.0 MB'
+  }  
 ];
 
 export function FileStatus() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [files] = useState<FileRecord[]>(mockFiles);
+  const [files, setFiles] = useState<FileRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const navigate = useNavigate();
+
+  // Fetch paginated data from API
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+
+    setFiles(mockFiles.slice((page - 1) * 10, page * 10));
+    setTotalPages(Math.ceil(mockFiles.length / 10));
+    setLoading(false);    
+
+
+    // Uncomment below to fetch from API
+    // fetch(`${API_HOST}${API_STATUS_ENDPOINT}?page=${page}&limit=10`)
+    //   .then(async (res) => {
+    //     if (!res.ok) {
+    //       throw new Error(await res.text() || "Failed to fetch file status");
+    //     }
+    //     return res.json();
+    //   })
+    //   .then((data) => {
+    //     // Expecting data: { files: FileRecord[], total: number }
+    //     if (!data || !Array.isArray(data.files) || data.files.length === 0) {
+    //       setFiles(mockFiles.slice((page - 1) * 10, page * 10));
+    //       setTotalPages(Math.ceil(mockFiles.length / 10));
+    //     } else {
+    //       setFiles(data.files);
+    //       setTotalPages(Math.ceil((data.total || 10) / 10));
+    //     }
+    //     setLoading(false);
+    //   })
+    //   .catch((err) => {
+    //     setError(err.message || "Failed to fetch file status");
+    //     setFiles(mockFiles.slice((page - 1) * 10, page * 10));
+    //     setTotalPages(Math.ceil(mockFiles.length / 10));
+    //     setLoading(false);
+    //   });
+  }, [page]);
 
   const filteredFiles = files.filter(file =>
     file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -189,95 +293,125 @@ export function FileStatus() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredFiles.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : error ? (
+            <div className="text-center py-8 text-red-600">{error}</div>
+          ) : filteredFiles.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>File Name</TableHead>
-                    <TableHead className="text-right">Record Count</TableHead>
-                    <TableHead>Job ID</TableHead>
-                    <TableHead>Date Uploaded</TableHead>
-                    <TableHead>Processing Status</TableHead>
-                    <TableHead>Uploaded By</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredFiles.map((file) => (
-                    <TableRow key={file.id} className="hover:bg-muted/50">
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>{file.fileName}</span>
-                          <span className="text-xs text-muted-foreground">{file.fileSize}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {file.recordCount > 0 ? file.recordCount.toLocaleString() : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <button
-                          onClick={() => handleViewRecords(file.jobId)}
-                          className="text-blue-600 hover:text-blue-800 hover:underline font-mono text-sm"
-                        >
-                          {file.jobId}
-                        </button>
-                      </TableCell>
-                      <TableCell className="text-sm">{file.dateUploaded}</TableCell>
-                      <TableCell>
-                        {getStatusBadge(file.processingStatus, file.errorMessage)}
-                      </TableCell>
-                      <TableCell className="text-sm">{file.uploadedBy}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {file.processingStatus === 'processed' && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleViewRecords(file.jobId)}
-                              title="View record details"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {file.processingStatus === 'process-failed' && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleViewRecords(file.jobId)}
-                              title="View error details"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {(file.processingStatus === 'upload-failed' || file.processingStatus === 'process-failed') && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleRetryJob(file.jobId)}
-                              title="Retry processing"
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => handleDeleteJob(file.jobId)}
-                            title="Delete job"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>File Name</TableHead>
+                      <TableHead className="text-right">Record Count</TableHead>
+                      <TableHead>Job ID</TableHead>
+                      <TableHead>Date Uploaded</TableHead>
+                      <TableHead>Processing Status</TableHead>
+                      <TableHead>Uploaded By</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFiles.map((file) => (
+                      <TableRow key={file.id} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span>{file.fileName}</span>
+                            <span className="text-xs text-muted-foreground">{file.fileSize}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {file.recordCount > 0 ? file.recordCount.toLocaleString() : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <button
+                            onClick={() => handleViewRecords(file.jobId)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-mono text-sm"
+                          >
+                            {file.jobId}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-sm">{file.dateUploaded}</TableCell>
+                        <TableCell>
+                          {getStatusBadge(file.processingStatus, file.errorMessage)}
+                        </TableCell>
+                        <TableCell className="text-sm">{file.uploadedBy}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {file.processingStatus === 'processed' && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleViewRecords(file.jobId)}
+                                title="View record details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {file.processingStatus === 'process-failed' && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleViewRecords(file.jobId)}
+                                title="View error details"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {(file.processingStatus === 'upload-failed' || file.processingStatus === 'process-failed') && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleRetryJob(file.jobId)}
+                                title="Retry processing"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteJob(file.jobId)}
+                              title="Delete job"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Pagination Controls */}
+              <div className="flex justify-center items-center gap-4 mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Prev
+                </Button>
+                <span>
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
