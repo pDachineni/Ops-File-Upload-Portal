@@ -159,36 +159,36 @@ export function FileStatus() {
     setLoading(true);
     setError(null);
 
-    setFiles(mockFiles.slice((page - 1) * 10, page * 10));
-    setTotalPages(Math.ceil(mockFiles.length / 10));
-    setLoading(false);    
+    // setFiles(mockFiles.slice((page - 1) * 10, page * 10));
+    // setTotalPages(Math.ceil(mockFiles.length / 10));
+    // setLoading(false);    
 
 
     // Uncomment below to fetch from API
-    // fetch(`${API_HOST}${API_STATUS_ENDPOINT}?page=${page}&limit=10`)
-    //   .then(async (res) => {
-    //     if (!res.ok) {
-    //       throw new Error(await res.text() || "Failed to fetch file status");
-    //     }
-    //     return res.json();
-    //   })
-    //   .then((data) => {
-    //     // Expecting data: { files: FileRecord[], total: number }
-    //     if (!data || !Array.isArray(data.files) || data.files.length === 0) {
-    //       setFiles(mockFiles.slice((page - 1) * 10, page * 10));
-    //       setTotalPages(Math.ceil(mockFiles.length / 10));
-    //     } else {
-    //       setFiles(data.files);
-    //       setTotalPages(Math.ceil((data.total || 10) / 10));
-    //     }
-    //     setLoading(false);
-    //   })
-    //   .catch((err) => {
-    //     setError(err.message || "Failed to fetch file status");
-    //     setFiles(mockFiles.slice((page - 1) * 10, page * 10));
-    //     setTotalPages(Math.ceil(mockFiles.length / 10));
-    //     setLoading(false);
-    //   });
+    fetch(`${API_HOST}${API_STATUS_ENDPOINT}?page=${page}&limit=10`)
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(await res.text() || "Failed to fetch file status");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        // Expecting data: { files: FileRecord[], total: number }
+        if (!data || !Array.isArray(data.files) || data.files.length === 0) {
+          setFiles(mockFiles.slice((page - 1) * 10, page * 10));
+          setTotalPages(Math.ceil(mockFiles.length / 10));
+        } else {
+          setFiles(data.files);
+          setTotalPages(Math.ceil((data.total || 10) / 10));
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message || "Failed to fetch file status");
+        setFiles(mockFiles.slice((page - 1) * 10, page * 10));
+        setTotalPages(Math.ceil(mockFiles.length / 10));
+        setLoading(false);
+      });
   }, [page]);
 
   const filteredFiles = files.filter(file =>
